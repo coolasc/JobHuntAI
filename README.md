@@ -18,3 +18,9 @@ Gemini, Grok, GitHub Copilot/Models) take an API key in the Settings menu, store
 
 Country search: if the location is a country or a known city (e.g. `Ireland`, `Dublin`), country-aware sources are
 queried for that country and results are filtered to it automatically.
+
+PDF: CV and cover letter can be loaded from `.pdf` files (text-based PDFs; scanned images are not supported) and
+generated documents can be downloaded as PDF. Auto-apply also saves `-cv.pdf` and `-cover-letter.pdf` files.
+
+Job log: every search appends new jobs (date found, country, remote/hybrid/local, URL) to `~/.jobhuntai/jobs.csv`.
+Shortcut: the "Job log (CSV)" link in the UI (`http://127.0.0.1:8765/jobs.csv`), or `python -m jobhunt --jobs-csv` to print the file path.

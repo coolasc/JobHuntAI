@@ -81,3 +81,29 @@ class T(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PdfAndTrackerTests(unittest.TestCase):
+    def test_pdf_roundtrip(self):
+        from jobhunt import pdf
+        text = "Jane Doe (Engineer)\nPython \\ Go\n" + "\n".join(f"line {i}" for i in range(120))
+        out = pdf.pdf_to_text(pdf.text_to_pdf(text))
+        self.assertIn("Jane Doe (Engineer)", out)
+        self.assertIn("Python \\ Go", out)
+        self.assertIn("line 119", out)
+
+    def test_tracker_dedupes(self):
+        import csv
+        import os
+        import tempfile
+        from jobhunt import tracker
+        with tempfile.TemporaryDirectory() as d:
+            os.environ["JOBHUNT_HOME"] = d
+            try:
+                job = {"title": "Dev", "company": "X", "location": "Dublin", "url": "http://a", "work_mode": "in-person", "score": 5}
+                self.assertEqual(tracker.record([job], "hybrid"), 1)
+                self.assertEqual(tracker.record([job], "hybrid"), 0)
+                rows = list(csv.DictReader(open(tracker.csv_path())))
+                self.assertEqual((rows[0]["country"], rows[0]["work_mode"]), ("Ireland", "hybrid"))
+            finally:
+                del os.environ["JOBHUNT_HOME"]
