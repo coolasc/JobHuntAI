@@ -1,6 +1,6 @@
 # JobHuntAI
 
-Scrapes public job boards (Remotive, Arbeitnow) for roles matching your CV, then rewrites your CV and cover letter
+Scrapes public job boards (Remotive, Arbeitnow, The Muse, Jobicy) and company career sites (Microsoft, Google, Greenhouse-hosted companies) for roles matching your CV, then rewrites your CV and cover letter
 for each job, keeping the tone of your original cover letter.
 
 ```
@@ -15,3 +15,6 @@ generate optimised documents (with a link to the job page) or "auto-apply", whic
 AI providers: local servers (Ollama, LM Studio, llama.cpp) are auto-detected. Online providers (OpenAI, Claude,
 Gemini, Grok, GitHub Copilot/Models) take an API key in the Settings menu, stored in `~/.jobhuntai/settings.json`
 (mode 600) and never sent back to the browser. Set `JOBHUNT_HOME` to change the directory.
+
+Country search: if the location is a country or a known city (e.g. `Ireland`, `Dublin`), country-aware sources are
+queried for that country and results are filtered to it automatically.
