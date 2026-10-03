@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8"><title>JobHuntAI</title>
+<style>body{font-family:sans-serif;max-width:900px;margin:1em auto;padding:0 1em}textarea{width:100%;height:9em}
+fieldset{margin:1em 0}.job{border:1px solid #ccc;padding:.5em;margin:.5em 0}pre{white-space:pre-wrap;background:#f6f6f6;padding:.5em}
+label{display:block;margin:.4em 0}</style></head><body>
+<h1>JobHuntAI</h1>
+<fieldset><legend>Your documents</legend>
+<label>CV (paste, or load .txt/.md) <input type="file" id="cvfile" accept=".txt,.md"><textarea id="cv"></textarea></label>
+<label>Original cover letter (used to keep your tone) <input type="file" id="clfile" accept=".txt,.md"><textarea id="cl"></textarea></label>
+</fieldset>
+<fieldset><legend>Search</legend>
+<label>Location <input id="loc" placeholder="e.g. London"></label>
+<label>Work type <select id="mode"><option>remote</option><option>in-person</option><option>hybrid</option></select></label>
+<label>Action <select id="action"><option value="">Generate optimised CV + cover letter</option>
+<option value="auto">Auto-apply (generate, save package &amp; open job page)</option></select></label>
+<button id="go">Find jobs</button> <span id="status"></span></fieldset>
+<div id="jobs"></div>
+<details><summary>Settings (AI provider &amp; API keys)</summary>
+<p id="detected"></p>
+<label>Provider <select id="prov"></select></label>
+<label>Model (blank = default) <input id="model" list="models"><datalist id="models"></datalist></label>
+<label>API key for selected online provider <input id="key" type="password" autocomplete="off" placeholder="stored locally, never shown again"></label>
+<button id="save">Save settings</button> <span id="sstatus"></span></details>
+<script>
+const $=id=>document.getElementById(id);
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+async function api(path,body){const r=await fetch(path,body?{method:'POST',body:JSON.stringify(body)}:{});
+ const j=await r.json();if(!r.ok)throw new Error(j.error);return j}
+for(const [f,t] of [['cvfile','cv'],['clfile','cl']])$(f).onchange=e=>e.target.files[0].text().then(x=>$(t).value=x);
+let S;
+async function loadSettings(){S=await api('/api/settings');
+ $('detected').textContent=S.local.length?'Detected local AI: '+S.local.map(l=>l.label).join(', '):'No local AI detected.';
+ const opts=[['auto','Auto (first detected local AI)']].concat(S.local.map(l=>[l.name,l.label]),S.online.map(o=>[o.name,o.label+(S.settings.keys_set.includes(o.name)?' ✓ key set':'')]));
+ $('prov').innerHTML=opts.map(o=>`<option value="${o[0]}">${esc(o[1])}</option>`).join('');
+ $('prov').value=S.settings.provider;$('model').value=S.settings.model;
+ $('models').innerHTML=S.local.flatMap(l=>l.models).map(m=>`<option value="${esc(m)}">`).join('')}
+$('save').onclick=async()=>{try{const b={provider:$('prov').value,model:$('model').value};
+ if($('key').value&&!S.local.some(l=>l.name==b.provider))b.api_keys={[b.provider]:$('key').value};
+ await api('/api/settings',b);$('key').value='';$('sstatus').textContent='Saved';await loadSettings()}catch(e){$('sstatus').textContent=e.message}};
+let jobs=[];
+$('go').onclick=async()=>{$('status').textContent='Searching...';$('jobs').innerHTML='';
+ try{jobs=(await api('/api/search',{cv:$('cv').value,location:$('loc').value,mode:$('mode').value})).jobs;
+ $('status').textContent=jobs.length+' jobs';
+ $('jobs').innerHTML=jobs.map((j,i)=>`<div class="job"><b>${esc(j.title)}</b> — ${esc(j.company)} (${esc(j.location)}) match ${j.score}%
+ <br><a href="${/^https?:/.test(j.url)?esc(j.url):'#'}" target="_blank" rel="noopener">Job page</a>
+ <button onclick="gen(${i})">${$('action').value?'Auto-apply':'Optimise CV + letter'}</button><div id="r${i}"></div></div>`).join('')}
+ catch(e){$('status').textContent=e.message}};
+async function gen(i){const o=$('r'+i);o.textContent='Generating...';
+ try{const r=await api('/api/generate',{job:jobs[i],cv:$('cv').value,cover_letter:$('cl').value,auto_apply:!!$('action').value});
+ const safe=/^https?:/.test(r.url);
+ o.innerHTML=`<h4>CV</h4><pre>${esc(r.cv)}</pre><h4>Cover letter</h4><pre>${esc(r.cover_letter)}</pre>`+
+ (r.saved_to?`<p>Saved to ${esc(r.saved_to)}</p>`:'')+(safe?`<a href="${esc(r.url)}" target="_blank" rel="noopener">Open job page</a>`:'');
+ if(r.saved_to&&safe)window.open(r.url,'_blank','noopener')}catch(e){o.textContent=e.message}}
+loadSettings();
+</script></body></html>
