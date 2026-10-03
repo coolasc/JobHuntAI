@@ -4,15 +4,15 @@ fieldset{margin:1em 0}.job{border:1px solid #ccc;padding:.5em;margin:.5em 0}pre{
 label{display:block;margin:.4em 0}</style></head><body>
 <h1>JobHuntAI</h1>
 <fieldset><legend>Your documents</legend>
-<label>CV (paste, or load .txt/.md) <input type="file" id="cvfile" accept=".txt,.md"><textarea id="cv"></textarea></label>
-<label>Original cover letter (used to keep your tone) <input type="file" id="clfile" accept=".txt,.md"><textarea id="cl"></textarea></label>
+<label>CV (paste, or load .txt/.md/.pdf) <input type="file" id="cvfile" accept=".txt,.md,.pdf"><textarea id="cv"></textarea></label>
+<label>Original cover letter (used to keep your tone) <input type="file" id="clfile" accept=".txt,.md,.pdf"><textarea id="cl"></textarea></label>
 </fieldset>
 <fieldset><legend>Search</legend>
 <label>Location <input id="loc" placeholder="e.g. London"></label>
 <label>Work type <select id="mode"><option>remote</option><option>in-person</option><option>hybrid</option></select></label>
 <label>Action <select id="action"><option value="">Generate optimised CV + cover letter</option>
 <option value="auto">Auto-apply (generate, save package &amp; open job page)</option></select></label>
-<button id="go">Find jobs</button> <span id="status"></span></fieldset>
+<button id="go">Find jobs</button> <span id="status"></span> <a href="/jobs.csv" download>Job log (CSV)</a></fieldset>
 <div id="jobs"></div>
 <details><summary>Settings (AI provider &amp; API keys)</summary>
 <p id="detected"></p>
@@ -25,7 +25,12 @@ const $=id=>document.getElementById(id);
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 async function api(path,body){const r=await fetch(path,body?{method:'POST',body:JSON.stringify(body)}:{});
  const j=await r.json();if(!r.ok)throw new Error(j.error);return j}
-for(const [f,t] of [['cvfile','cv'],['clfile','cl']])$(f).onchange=e=>e.target.files[0].text().then(x=>$(t).value=x);
+for(const [f,t] of [['cvfile','cv'],['clfile','cl']])$(f).onchange=async e=>{const file=e.target.files[0];if(!file)return;
+ if(/\.pdf$/i.test(file.name)){const r=await fetch('/api/pdf-to-text',{method:'POST',body:file});const j=await r.json();
+  if(!r.ok){alert(j.error);return}$(t).value=j.text}else $(t).value=await file.text()};
+async function dlPdf(text,name){const r=await fetch('/api/text-to-pdf',{method:'POST',body:JSON.stringify({text})});
+ const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=name;a.click()}
+const pdfTexts={};
 let S;
 async function loadSettings(){S=await api('/api/settings');
  $('detected').textContent=S.local.length?'Detected local AI: '+S.local.map(l=>l.label).join(', '):'No local AI detected.';
@@ -47,7 +52,7 @@ $('go').onclick=async()=>{$('status').textContent='Searching...';$('jobs').inner
 async function gen(i){const o=$('r'+i);o.textContent='Generating...';
  try{const r=await api('/api/generate',{job:jobs[i],cv:$('cv').value,cover_letter:$('cl').value,auto_apply:!!$('action').value});
  const safe=/^https?:/.test(r.url);
- o.innerHTML=`<h4>CV</h4><pre>${esc(r.cv)}</pre><h4>Cover letter</h4><pre>${esc(r.cover_letter)}</pre>`+
+ pdfTexts[i]=r;o.innerHTML=`<button onclick="dlPdf(pdfTexts[${i}].cv,'cv.pdf')">CV as PDF</button> <button onclick="dlPdf(pdfTexts[${i}].cover_letter,'cover-letter.pdf')">Cover letter as PDF</button><h4>CV</h4><pre>${esc(r.cv)}</pre><h4>Cover letter</h4><pre>${esc(r.cover_letter)}</pre>`+
  (r.saved_to?`<p>Saved to ${esc(r.saved_to)}</p>`:'')+(safe?`<a href="${esc(r.url)}" target="_blank" rel="noopener">Open job page</a>`:'');
  if(r.saved_to&&safe)window.open(r.url,'_blank','noopener')}catch(e){o.textContent=e.message}}
 loadSettings();
