@@ -42,6 +42,32 @@ class T(unittest.TestCase):
         self.assertEqual(scraper.filter_jobs([JOB], "Paris", "remote"), [JOB])
         self.assertEqual(scraper.filter_jobs([JOB], "Paris", "in-person"), [])
 
+    def test_country_search_ireland(self):
+        self.assertEqual(scraper.resolve_country("Ireland"), "ireland")
+        self.assertEqual(scraper.resolve_country("Dublin"), "ireland")
+        seen = []
+
+        def ms(q, country=None):
+            seen.append(country)
+            return [{**JOB, "url": "m", "company": "Microsoft", "location": "Dublin, Ireland", "work_mode": "in-person"},
+                    {**JOB, "url": "n", "location": "Seattle, United States", "work_mode": "in-person"}]
+        ms.country_aware = True
+        jobs = scraper.find_jobs("python django", "Ireland", "in-person", sources=[ms])
+        self.assertEqual([j["company"] for j in jobs], ["Microsoft"])
+        self.assertEqual(set(seen), {"ireland"})
+
+    def test_company_sources_registered(self):
+        names = {s.__name__ for s in scraper.SOURCES}
+        self.assertTrue({"search_microsoft", "search_google", "search_greenhouse"} <= names)
+
+    def test_microsoft_parsing(self):
+        resp = {"operationResult": {"result": {"jobs": [{"title": "SWE", "jobId": "1", "properties": {
+            "locations": ["Dublin, Ireland"], "description": "<b>python</b>"}}]}}}
+        with mock.patch.object(scraper, "_request", return_value=resp) as r:
+            jobs = scraper.search_microsoft("python", "ireland")
+        self.assertIn("lc=Ireland", r.call_args[0][0])
+        self.assertEqual(jobs[0]["company"], "Microsoft")
+
     def test_find_jobs(self):
         jobs = scraper.find_jobs("python python django", "", "remote", sources=[lambda q: [dict(JOB)]])
         self.assertEqual(len(jobs), 1)
